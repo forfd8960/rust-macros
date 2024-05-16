@@ -1,33 +1,44 @@
-#[macro_export]
-macro_rules! my_vec {
-    () => {Vec::new()};
-    ($elem:expr; $n:expr) => { std::vec::from_elem($elem,$n) };
-    ($($x:expr),+ $(,)?) => {
-        {
-            let mut temp_vec = Vec::new();
-            $(temp_vec.push($x);)*
-            temp_vec
-        }
-    };
-}
+// for enum, generate From implements for each variant
 
-// ? operator
-#[macro_export]
-macro_rules! my_try {
-    ($expr:expr) => {
-        match $expr {
-            std::result::Result::Ok(val) => val,
-            std::result::Result::Err(err) => return Err(err.into()),
-        }
-    };
-}
+use proc_macro::TokenStream;
+use quote::quote;
 
-#[macro_export]
-macro_rules! my_ready {
-    ($expr:expr) => {
-        match $expr {
-            std::task::Poll::Ready(v) => std::task::Poll::Ready(v),
-            std::task::Poll::Pending => return std::task::Poll::Pending,
-        }
+#[proc_macro_derive(EnumFrom)]
+pub fn derive_enum_from(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    let enum_name = input.ident;
+    // get enum variant
+    let variants = match input.data {
+        syn::Data::Enum(data) => data.variants,
+        _ => panic!("only works for enum"),
     };
+
+    //for each variant, get the ident and fields
+    let from_impls = variants.iter().map(|var| {
+        let variant_name = &var.ident;
+        match &var.fields {
+            syn::Fields::Unnamed(fields) => {
+                if fields.unnamed.len() != 1 {
+                    quote! {}
+                } else {
+                    let field = fields.unnamed.first().unwrap();
+                    let ty = &field.ty;
+                    quote! {
+                        impl From<#ty> for #enum_name {
+                            fn from(v: #ty) -> Self {
+                                #enum_name::#variant_name(v)
+                            }
+                        }
+                    }
+                }
+            }
+            _ => quote! {},
+        }
+    });
+
+    quote! {
+        #(#from_impls)*
+    }
+    .into()
 }
