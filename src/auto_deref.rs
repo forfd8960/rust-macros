@@ -36,11 +36,6 @@ pub(crate) fn process_auto_deref(input: DeriveInput) -> TokenStream {
         panic!("")
     };
 
-    println!("{:?}", ident);
-    println!("{:?}", generics);
-    println!("mutable {:#?}", mutable);
-    println!("field {:#?}", field);
-
     let (f, ty) = if let Some(field) = field {
         match fields.iter().find(|f| f.ident.as_ref().unwrap() == &field) {
             Some(f) => (field, &f.ty),
@@ -65,16 +60,12 @@ pub(crate) fn process_auto_deref(input: DeriveInput) -> TokenStream {
     if mutable {
         code.push(quote! {
             impl #generics std::ops::DerefMut for #ident #generics {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.#f
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.#f
+                }
             }
-        }
         });
     }
 
     quote! {#(#code)*}
-}
-
-pub(crate) fn process_auto_debug(_input: DeriveInput) -> TokenStream {
-    quote! {}
 }
